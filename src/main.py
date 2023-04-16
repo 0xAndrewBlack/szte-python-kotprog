@@ -1,6 +1,7 @@
 import os
 import random
 import discord
+import logging
 
 from typing import Literal, Union, NamedTuple
 from discord import app_commands
@@ -9,6 +10,12 @@ from enum import Enum
 
 BOT_TOKEN = config('DC_BOT_TOKEN')
 MY_GUILD = discord.Object(id=config('GUILD_ID', cast=int))
+
+discord.utils.setup_logging()
+handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
+logger = logging.getLogger('discord')
+logger.setLevel(logging.INFO)
+logging.getLogger('discord.http').setLevel(logging.DEBUG)
 
 
 class MyClient(discord.Client):
@@ -28,8 +35,8 @@ client = MyClient()
 
 @client.event
 async def on_ready():
-    print(f'Logged in as {client.user} (ID: {client.user.id})')
-    print('-'*50)
+    logger.info(f'Logged in as {client.user} (ID: {client.user.id})')
+    logger.info('-'*50)
 
 
 @client.tree.command()
@@ -71,4 +78,4 @@ async def shop(interaction: discord.Interaction, action: Literal['Buy', 'Sell'],
     await interaction.response.send_message(f'Action: {action}\nItem: {item}')
 
 
-client.run(BOT_TOKEN)
+client.run(BOT_TOKEN, log_handler=handler, log_level=logging.DEBUG)
