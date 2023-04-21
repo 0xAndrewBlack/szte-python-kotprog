@@ -1,0 +1,48 @@
+version: "3"
+
+services:
+  database:
+    image: postgres:alpine
+    container_name: python_database
+    hostname: postgres
+    restart: on-failure
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "pg_isready -U python"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - ./deployment/data/pg_data:/var/lib/postgresql/data
+    ports:
+      - 5432:5432
+      - 5433:5433
+    networks:
+      python_net:
+        ipv4_address: 10.10.13.2
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: python_pgadmin
+    hostname: pgadmin
+    restart: on-failure
+    depends_on:
+      - database
+    env_file:
+      - .env
+    volumes:
+      - ./deployment/data/pg_admin_data:/var/lib/pgadmin
+    ports:
+      - "5050:80"
+    networks:
+      python_net:
+        ipv4_address: 10.10.13.3
+
+networks:
+  python_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.10.13.0/24
+          gateway: 10.10.13.1
