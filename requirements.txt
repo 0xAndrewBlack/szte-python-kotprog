@@ -1,2 +1,9 @@
-autopep8==2.0.1
 discord.py==2.2.2
+flake8~=6.0.0
+prisma~=0.8.2
+python-decouple==3.8
+python-dotenv~=1.0.0
+tox~=4.5.1
+setuptools==67.7.2
+pytest~=7.3.1
+pytest-asyncio==0.21.0
