@@ -53,7 +53,7 @@ class Market:
         return item
 
     @staticmethod
-    async def update_item(item_id, item, description, seller_id, action, price, currency, message_id):
+    async def update_item(item_id, item, status, description, seller_id, action, price, currency):
         prisma = Prisma()
         await prisma.connect()
 
@@ -72,7 +72,7 @@ class Market:
                 "price": price,
                 "listing": str(action).upper(),
                 "currency": currency,
-                "message_id": str(message_id),
+                "status": str(status).lower(),
             }
         )
 

@@ -15,6 +15,9 @@ discord.utils.setup_logging()
 
 logger = logging.getLogger(str(__name__).upper())
 
+logging.getLogger("discord.client").setLevel(logging.WARN)
+logging.getLogger("discord.gateway").setLevel(logging.WARN)
+
 
 class MarketClient(discord.Client):
     def __init__(self):
@@ -36,6 +39,10 @@ bot = MarketClient()
 async def on_ready():
     logger.info(f'Logged in as {bot.user} (ID: {bot.user.id})')
     logger.info('-' * 50)
+
+@bot.event
+async def on_ratelimit(rate_limit):
+    logger.warning(f'Rate limited for {rate_limit} seconds')
 
 
 @bot.tree.command(name='roll', description='Rolls the dice')
@@ -64,6 +71,26 @@ async def channel_info(interaction: discord.Interaction, channel: Union[discord.
 
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
+@bot.tree.command(name='server-info', description='Shows basic server info')
+@app_commands.describe()
+async def server_info(interaction: discord.Interaction):
+    """Shows basic server info"""
+
+    guild = interaction.guild
+
+    embed = discord.Embed(title='Server Info')
+
+    embed.add_field(name='Name', value=guild.name, inline=False)
+    embed.add_field(name='ID', value=guild.id, inline=False)
+    embed.add_field(name='Owner', value=f'<@{guild.owner_id}>', inline=False)
+    # embed.add_field(name='Categories', value=len(guild.categories), inline=True)
+    embed.add_field(name='Members', value=guild.member_count, inline=True)
+    embed.add_field(name='Channels', value=len(guild.channels), inline=True)
+    embed.add_field(name='Roles', value=len(guild.roles), inline=True)
+
+    embed.set_footer(text='Created').timestamp = guild.created_at
+
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
 @bot.tree.command(name='marketplace', description='Shows the marketplace items')
 @app_commands.describe()
@@ -92,43 +119,18 @@ async def shop(interaction: discord.Interaction, action: Literal['Buy', 'Sell', 
                price: int, currency: Literal['HUF', 'USD', 'EUR', 'GBP']):
     """Interact with the shop"""
 
-    if action == 'Sell':
-        embed = discord.Embed(title='Marketplace - List Order')
-        embed.description = f'```{description}```'
-        embed.add_field(name='Seller', value=f"<@{interaction.user.id}>", inline=False)
-        embed.add_field(name='Item', value=item, inline=True)
-        embed.add_field(name='Action', value=action, inline=True)
-        embed.add_field(name='Price', value=f'{price}{currency}', inline=True)
+    embed = discord.Embed(title=f'{item} - List Order')
+    embed.description = f'```{description}```'
+    embed.add_field(name='Seller', value=f"<@{interaction.user.id}>", inline=True)
+    embed.add_field(name='Action', value=action, inline=True)
+    embed.add_field(name='Price', value=f'{price}{currency}', inline=True)
 
-        # sent = await interaction.response.send_message(embed=embed, ephemeral=True)
+    SHOP_CHANNEL = bot.get_channel(constants.SHOP_CHANNEL)
 
-        await bot.market.add_item(item, description, interaction.user.id, action, price, currency, 0),
+    sent = await SHOP_CHANNEL.send(embed=embed)
 
-    if action == 'Buy':
-        embed = discord.Embed(title='Marketplace - Buy Order')
-        embed.description = f'```{description}```'
-        embed.add_field(name='Buyer', value=f"<@{interaction.user.id}>", inline=False)
-        embed.add_field(name='Item', value=item, inline=True)
-        embed.add_field(name='Action', value=action, inline=True)
-        embed.add_field(name='Price', value=f'{price}{currency}', inline=True)
-
-        # sent = await interaction.response.send_message(embed=embed, ephemeral=True)
-        await bot.market.add_item(item, description, interaction.user.id, action, price, currency, 0),
-
-    if action == 'Trade':
-        embed = discord.Embed(title='Marketplace - Trade Order')
-        embed.description = f'```{description}```'
-        embed.add_field(name='Trader', value=f"<@{interaction.user.id}>", inline=False)
-        embed.add_field(name='Item', value=item, inline=True)
-        embed.add_field(name='Action', value=action, inline=True)
-        embed.add_field(name='Price', value=f'{price}{currency}', inline=True)
-
-        # sent = await interaction.response.send_message(embed=embed, ephemeral=True)
-        await bot.market.add_item(item, description, interaction.user.id, action, price, currency, 0),
-
-    channel = bot.get_channel(constants.SHOP_CHANNEL)
-
-    await channel.send(embed=embed)
+    await bot.market.add_item(item, description, interaction.user.id, action, price, currency, sent.id)
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
 @bot.tree.command(name='delete', description='Deletes a marketplace item')
@@ -136,55 +138,49 @@ async def shop(interaction: discord.Interaction, action: Literal['Buy', 'Sell', 
 async def delete(interaction: discord.Interaction, item_id: int):
     """Deletes a marketplace item"""
 
+    item = await bot.market.get_item(item_id)
     await bot.market.delete_item(item_id, interaction.user.id)
 
     embed = discord.Embed(title='Marketplace - Deleted Item')
     embed.description = '```Item successfully deleted```'
 
+    SHOP_CHANNEL = bot.get_channel(constants.SHOP_CHANNEL)
+
+    try:
+        message = await SHOP_CHANNEL.fetch_message(item.message_id)
+        
+        await message.delete()
+    except discord.NotFound:
+        logger.error(f'Could not find message with id {item.message_id}, probably already deleted/sold')
+    
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
 @bot.tree.command(name='update', description='Updates a marketplace item')
 @app_commands.describe(item_id='The item id to update', action='The action to do in the shop', item='The target item')
 async def update(interaction: discord.Interaction, item_id: int, action: Literal['Buy', 'Sell', 'Trade'], item: str,
+                 status: Literal['Available', 'Sold', 'Pending'],
                  description: str, price: int, currency: Literal['HUF', 'USD', 'EUR', 'GBP']):
     """Updates a marketplace item"""
 
-    if action == 'Sell':
-        embed = discord.Embed(title='Marketplace - List Order')
-        embed.description = f'```{description}```'
-        embed.add_field(name='Seller', value=f"<@{interaction.user.id}>", inline=False)
-        embed.add_field(name='Item', value=item, inline=True)
-        embed.add_field(name='Action', value=action, inline=True)
-        embed.add_field(name='Price', value=f'{price}{currency}', inline=True)
+    embed = discord.Embed(title=f'{item} - {action} Order')
+    embed.description = f'```{description}```'
+    embed.add_field(name='Seller', value=f"<@{interaction.user.id}>", inline=True)
+    embed.add_field(name='Action', value=action, inline=True)
+    embed.add_field(name='Price', value=f'{price}{currency}', inline=True)
 
-        await bot.market.update_item(item_id, item, description, interaction.user.id, action, price, currency, 0)
+    await bot.market.update_item(item_id, item, status, description, interaction.user.id, action, price, currency)
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+    SHOP_CHANNEL = bot.get_channel(constants.SHOP_CHANNEL)
 
-    if action == 'Buy':
-        embed = discord.Embed(title='Marketplace - Buy Order')
-        embed.description = f'```{description}```'
-        embed.add_field(name='Buyer', value=f"<@{interaction.user.id}>", inline=False)
-        embed.add_field(name='Item', value=item, inline=True)
-        embed.add_field(name='Action', value=action, inline=True)
-        embed.add_field(name='Price', value=f'{price}{currency}', inline=True)
+    fetched_item = await bot.market.get_item(item_id)
+    message = await SHOP_CHANNEL.fetch_message(fetched_item.message_id)
 
-        await bot.market.update_item(item_id, item, description, interaction.user.id, action, price, currency, 0)
+    await message.edit(embed=embed)
 
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-    if action == 'Trade':
-        embed = discord.Embed(title='Marketplace - Trade Order')
-        embed.description = f'```{description}```'
-        embed.add_field(name='Trader', value=f"<@{interaction.user.id}>", inline=False)
-        embed.add_field(name='Item', value=item, inline=True)
-        embed.add_field(name='Action', value=action, inline=True)
-        embed.add_field(name='Price', value=f'{price}{currency}', inline=True)
-
-        await bot.market.update_item(item_id, item, description, interaction.user.id, action, price, currency, 0)
-
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+    if status == 'Sold' or status == 'Pending':
+        await message.delete()
 
 
 @bot.tree.command(name='ping', description='Latency of the bot.')
