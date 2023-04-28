@@ -71,6 +71,26 @@ async def channel_info(interaction: discord.Interaction, channel: Union[discord.
 
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
+@bot.tree.command(name='server-info', description='Shows basic server info')
+@app_commands.describe()
+async def server_info(interaction: discord.Interaction):
+    """Shows basic server info"""
+
+    guild = interaction.guild
+
+    embed = discord.Embed(title='Server Info')
+
+    embed.add_field(name='Name', value=guild.name, inline=False)
+    embed.add_field(name='ID', value=guild.id, inline=False)
+    embed.add_field(name='Owner', value=f'<@{guild.owner_id}>', inline=False)
+    # embed.add_field(name='Categories', value=len(guild.categories), inline=True)
+    embed.add_field(name='Members', value=guild.member_count, inline=True)
+    embed.add_field(name='Channels', value=len(guild.channels), inline=True)
+    embed.add_field(name='Roles', value=len(guild.roles), inline=True)
+
+    embed.set_footer(text='Created').timestamp = guild.created_at
+
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
 @bot.tree.command(name='marketplace', description='Shows the marketplace items')
 @app_commands.describe()
