@@ -24,6 +24,5 @@ jobs:
       - name: 📦 Build and push
         uses: docker/build-push-action@v4
         with:
-          context: .
           push: true
           tags: ${{ github.repository }}:${{ github.ref_name }}
