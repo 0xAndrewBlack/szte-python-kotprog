@@ -22,7 +22,7 @@ Python Discord BOT for a simple market system. Made for a university course.
 2. Install the requirements with `pip install -r requirements.txt`
 3. Invite your bot to your server
 4. Start the database with `docker-compose up -d` or by running `docker-compose.yml` in your IDE.
-5. Start the bot by running `python src/main.py` or by clicking the play button in your IDE.
+5. Start the bot by running `python marketbot/main.py` or by clicking the play button in your IDE.
 6. Have fun!
 
 ### Configuration
