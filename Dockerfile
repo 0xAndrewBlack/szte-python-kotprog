@@ -8,8 +8,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN chmod +x src/main.py
+RUN chmod +x marketbot/main.py
 
 RUN prisma generate
  
-CMD [ "python", "src/main.py" ]
+CMD [ "python", "marketbot/main.py" ]
