@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import Mock, patch
 
-from src import market
+from marketbot import market
 
 
 @pytest.mark.asyncio
